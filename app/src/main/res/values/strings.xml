@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">סורק ומנהל Wi-Fi</string>
-    <string name="wifi_sensor_title">מצב חיישן Wi-Fi</string>
+    <string name="wifi_sensor_title">חיישן Wi-Fi עצמאי</string>
     <string name="wifi_on">פעיל</string>
     <string name="wifi_off">כבוי</string>
     <string name="scan_now">סרוק כעת</string>
@@ -11,7 +11,7 @@
     <string name="not_connected">לא מחובר לרשת</string>
     <string name="available_networks">רשתות בסביבה</string>
     <string name="scanning">סורק רשתות זמינות...</string>
-    <string name="no_networks_found">לא נמצאו רשתות Wi-Fi</string>
+    <string name="no_networks_found">לא נמצאו רשתות Wi-Fi בסביבה</string>
     <string name="security_open">פתוחה (ללא סיסמה)</string>
     <string name="security_secured">מוגנת בסיסמה</string>
     <string name="connect">התחבר</string>
@@ -24,10 +24,11 @@
     <string name="password_hint">סיסמת Wi-Fi</string>
     <string name="favorite_added">נוסף למועדפים</string>
     <string name="favorite_removed">הוסר מהמועדפים</string>
-    <string name="wifi_enabled_msg">חיישן Wi-Fi הופעל בהצלחה</string>
-    <string name="wifi_disabled_msg">חיישן Wi-Fi הופסק</string>
-    <string name="permission_required">נדרשת הרשאת מיקום לסריקת רשתות Wi-Fi</string>
-    <string name="saved_favorites_title">רשתות מועדפות</string>
+    <string name="favorite_saved">שמור במועדפים</string>
+    <string name="wifi_enabled_msg">חיישן Wi-Fi הופעל בהצלחה באפליקציה</string>
+    <string name="wifi_disabled_msg">חיישן Wi-Fi הופסק באפליקציה</string>
+    <string name="permission_required">נדרשת הרשאת מיקום לסריקת רשתות Wi-Fi עצמאית</string>
+    <string name="saved_favorites_title">רשתות מועדפות שמורות</string>
     <string name="no_favorites">אין רשתות מועדפות שמורות</string>
     <string name="settings_title">הגדרות התחברות</string>
     <string name="auto_turn_on_wifi">הפעל חיישן Wi-Fi אוטומטית בפתיחת האפליקציה</string>
@@ -36,6 +37,10 @@
     <string name="clear_favorites">מחק את כל המועדפים</string>
     <string name="favorites_cleared">כל המועדפים נמחקו</string>
     <string name="connecting">מתחבר לרשת...</string>
-    <string name="connect_failed">ההתחברות נכשלה</string>
+    <string name="connect_failed">ההתחברות נכשלה. בדוק את הסיסמה או מצב החיישן.</string>
+    <string name="disconnected_msg">נותקת בהצלחה מהרשת</string>
+    <string name="location_disabled_warning">שירותי מיקום כבויים במכשיר. הפעל מיקום לסריקה מדויקת.</string>
+    <string name="enable_location">הפעל מיקום</string>
+    <string name="network_details_title">פרטי רשת מחוברת</string>
     <string name="back">חזרה</string>
 </resources>

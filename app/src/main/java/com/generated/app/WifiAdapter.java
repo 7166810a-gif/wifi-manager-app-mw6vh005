@@ -48,6 +48,7 @@ public class WifiAdapter extends BaseAdapter {
             holder = new ViewHolder();
             holder.tvSsid = convertView.findViewById(R.id.tv_item_ssid);
             holder.tvDetails = convertView.findViewById(R.id.tv_item_details);
+            holder.tvSignalBadge = convertView.findViewById(R.id.tv_signal_badge);
             holder.ivLock = convertView.findViewById(R.id.iv_lock_status);
             holder.ivFav = convertView.findViewById(R.id.iv_favorite);
             convertView.setTag(holder);
@@ -62,11 +63,21 @@ public class WifiAdapter extends BaseAdapter {
         String freqStr = WifiHelper.getFrequencyBand(item.getFrequency());
         int signalPct = WifiHelper.calculateSignalPercentage(item.getLevel());
 
-        String details = securityStr + " | " + freqStr + " | " + signalPct + "% (" + item.getLevel() + " dBm)";
+        String details = securityStr + " | " + freqStr + " (" + item.getLevel() + " dBm)";
         if (item.isConnected()) {
             details = "★ " + context.getString(R.string.current_network) + " • " + details;
         }
         holder.tvDetails.setText(details);
+
+        holder.tvSignalBadge.setText(signalPct + "%");
+        int signalLevel = WifiHelper.getSignalLevel(item.getLevel());
+        if (signalLevel >= 2) {
+            holder.tvSignalBadge.setBackgroundResource(R.drawable.bg_signal_high);
+        } else if (signalLevel == 1) {
+            holder.tvSignalBadge.setBackgroundResource(R.drawable.bg_signal_mid);
+        } else {
+            holder.tvSignalBadge.setBackgroundResource(R.drawable.bg_signal_low);
+        }
 
         if (item.isOpen()) {
             holder.ivLock.setImageResource(R.drawable.ic_unlock);
@@ -95,6 +106,7 @@ public class WifiAdapter extends BaseAdapter {
     private static class ViewHolder {
         TextView tvSsid;
         TextView tvDetails;
+        TextView tvSignalBadge;
         ImageView ivLock;
         ImageView ivFav;
     }

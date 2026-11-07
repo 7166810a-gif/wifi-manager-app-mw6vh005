@@ -1,10 +1,11 @@
 package com.generated.app;
 
 import android.content.Context;
-import android.net.wifi.ScanResult;
+import android.location.LocationManager;
 import android.net.wifi.WifiConfiguration;
-import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.provider.Settings;
 
 import java.util.List;
 
@@ -34,8 +35,14 @@ public class WifiHelper {
         return WifiManager.calculateSignalLevel(rssi, 100);
     }
 
+    public static int getSignalLevel(int rssi) {
+        return WifiManager.calculateSignalLevel(rssi, 4);
+    }
+
     public static String getFrequencyBand(int frequency) {
-        if (frequency >= 4900 && frequency <= 5850) {
+        if (frequency >= 5925 && frequency <= 7125) {
+            return "6 GHz";
+        } else if (frequency >= 4900 && frequency <= 5850) {
             return "5 GHz";
         } else if (frequency >= 2400 && frequency <= 2484) {
             return "2.4 GHz";
@@ -56,6 +63,22 @@ public class WifiHelper {
             return ssid.substring(1, ssid.length() - 1);
         }
         return ssid;
+    }
+
+    public static boolean isLocationEnabled(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+            return lm != null && lm.isLocationEnabled();
+        } else {
+            int mode = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF);
+            return mode != Settings.Secure.LOCATION_MODE_OFF;
+        }
+    }
+
+    public static void disconnect(WifiManager wifiManager) {
+        if (wifiManager != null && wifiManager.isWifiEnabled()) {
+            wifiManager.disconnect();
+        }
     }
 
     public static boolean connectToNetwork(WifiManager wifiManager, String ssid, String password, boolean isOpen) {

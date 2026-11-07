@@ -14,12 +14,14 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Switch;
@@ -29,7 +31,9 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSION_REQUEST_CODE = 2001;
@@ -40,12 +44,16 @@ public class MainActivity extends Activity {
     private TextView tvConnectedSsid;
     private TextView tvConnectedDetails;
     private TextView tvBadgeStatus;
+    private Button btnDisconnect;
     private Button btnScanNow;
     private Button btnFavorites;
     private Button btnSettings;
     private ProgressBar progressScanning;
     private TextView tvEmptyState;
     private ListView lvWifiNetworks;
+
+    private LinearLayout containerLocationWarning;
+    private Button btnEnableLocation;
 
     private List<WifiNetworkItem> wifiList = new ArrayList<>();
     private WifiAdapter wifiAdapter;
@@ -96,21 +104,32 @@ public class MainActivity extends Activity {
         tvConnectedSsid = findViewById(R.id.tv_connected_ssid);
         tvConnectedDetails = findViewById(R.id.tv_connected_details);
         tvBadgeStatus = findViewById(R.id.tv_badge_status);
+        btnDisconnect = findViewById(R.id.btn_disconnect);
         btnScanNow = findViewById(R.id.btn_scan_now);
         btnFavorites = findViewById(R.id.btn_favorites);
         btnSettings = findViewById(R.id.btn_settings);
         progressScanning = findViewById(R.id.progress_scanning);
         tvEmptyState = findViewById(R.id.tv_empty_state);
         lvWifiNetworks = findViewById(R.id.lv_wifi_networks);
+
+        containerLocationWarning = findViewById(R.id.container_location_warning);
+        btnEnableLocation = findViewById(R.id.btn_enable_location);
     }
 
     private void setupListeners() {
         switchWifiToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (wifiManager != null) {
-                    setWifiEnabledIndependent(isChecked);
-                }
+                setWifiEnabledIndependent(isChecked);
+            }
+        });
+
+        btnDisconnect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                WifiHelper.disconnect(wifiManager);
+                Toast.makeText(MainActivity.this, R.string.disconnected_msg, Toast.LENGTH_SHORT).show();
+                updateCurrentConnectionUI();
             }
         });
 
@@ -135,6 +154,17 @@ public class MainActivity extends Activity {
             }
         });
 
+        btnEnableLocation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, R.string.permission_required, Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
         lvWifiNetworks.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -146,12 +176,17 @@ public class MainActivity extends Activity {
 
     private void setWifiEnabledIndependent(boolean enable) {
         if (wifiManager != null) {
+            boolean current = wifiManager.isWifiEnabled();
+            if (current == enable) {
+                updateWifiStateUI();
+                return;
+            }
             boolean success = wifiManager.setWifiEnabled(enable);
             if (success) {
                 String msg = enable ? getString(R.string.wifi_enabled_msg) : getString(R.string.wifi_disabled_msg);
                 Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "שינוי מצב Wi-Fi ע\"י האפליקציה", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(enable ? R.string.wifi_enabled_msg : R.string.wifi_disabled_msg), Toast.LENGTH_SHORT).show();
             }
             updateWifiStateUI();
         }
@@ -175,11 +210,22 @@ public class MainActivity extends Activity {
         if (!wifiManager.isWifiEnabled()) {
             setWifiEnabledIndependent(true);
         }
+
+        checkLocationServiceState();
+
         progressScanning.setVisibility(View.VISIBLE);
         boolean started = wifiManager.startScan();
         if (!started) {
             progressScanning.setVisibility(View.GONE);
             updateWifiList();
+        }
+    }
+
+    private void checkLocationServiceState() {
+        if (!WifiHelper.isLocationEnabled(this)) {
+            containerLocationWarning.setVisibility(View.VISIBLE);
+        } else {
+            containerLocationWarning.setVisibility(View.GONE);
         }
     }
 
@@ -194,7 +240,8 @@ public class MainActivity extends Activity {
             updateCurrentConnectionUI();
         } else {
             tvConnectedSsid.setText(getString(R.string.not_connected));
-            tvConnectedDetails.setText("Wi-Fi כבוי");
+            tvConnectedDetails.setText("חיישן Wi-Fi כבוי");
+            btnDisconnect.setVisibility(View.GONE);
             wifiList.clear();
             wifiAdapter.notifyDataSetChanged();
             tvEmptyState.setVisibility(View.VISIBLE);
@@ -204,15 +251,19 @@ public class MainActivity extends Activity {
     private void updateCurrentConnectionUI() {
         if (wifiManager == null || !wifiManager.isWifiEnabled()) return;
         WifiInfo info = wifiManager.getConnectionInfo();
-        if (info != null && info.getNetworkId() != -1) {
+        if (info != null && info.getNetworkId() != -1 && info.getSSID() != null && !info.getSSID().contains("unknown")) {
             String ssid = WifiHelper.sanitizeSsid(info.getSSID());
             tvConnectedSsid.setText(ssid);
             String ip = WifiHelper.formatIpAddress(info.getIpAddress());
             int speed = info.getLinkSpeed();
-            tvConnectedDetails.setText("IP: " + ip + " | " + speed + " Mbps | " + info.getRssi() + " dBm");
+            int rssi = info.getRssi();
+            int pct = WifiHelper.calculateSignalPercentage(rssi);
+            tvConnectedDetails.setText("IP: " + ip + " | " + speed + " Mbps | " + pct + "% (" + rssi + " dBm)");
+            btnDisconnect.setVisibility(View.VISIBLE);
         } else {
             tvConnectedSsid.setText(getString(R.string.not_connected));
             tvConnectedDetails.setText("IP: -- | Signal: --");
+            btnDisconnect.setVisibility(View.GONE);
         }
     }
 
@@ -225,10 +276,18 @@ public class MainActivity extends Activity {
         WifiInfo currentInfo = wifiManager.getConnectionInfo();
         String currentSsid = currentInfo != null ? WifiHelper.sanitizeSsid(currentInfo.getSSID()) : "";
 
+        Map<String, ScanResult> bestResults = new HashMap<>();
+
         if (results != null) {
             for (ScanResult res : results) {
                 if (res.SSID == null || res.SSID.trim().isEmpty()) continue;
+                ScanResult existing = bestResults.get(res.SSID);
+                if (existing == null || res.level > existing.level) {
+                    bestResults.put(res.SSID, res);
+                }
+            }
 
+            for (ScanResult res : bestResults.values()) {
                 boolean isOpen = WifiHelper.isOpenNetwork(res.capabilities);
                 boolean isFav = PreferencesManager.isFavorite(this, res.SSID);
                 boolean isConnected = currentSsid.equals(res.SSID);
@@ -249,6 +308,12 @@ public class MainActivity extends Activity {
         Collections.sort(wifiList, new Comparator<WifiNetworkItem>() {
             @Override
             public int compare(WifiNetworkItem o1, WifiNetworkItem o2) {
+                if (o1.isConnected() != o2.isConnected()) {
+                    return o1.isConnected() ? -1 : 1;
+                }
+                if (o1.isFavorite() != o2.isFavorite()) {
+                    return o1.isFavorite() ? -1 : 1;
+                }
                 return Integer.compare(o2.getLevel(), o1.getLevel());
             }
         });
@@ -273,6 +338,11 @@ public class MainActivity extends Activity {
     }
 
     private void handleNetworkClick(final WifiNetworkItem item) {
+        if (item.isConnected()) {
+            showNetworkDetailsDialog(item);
+            return;
+        }
+
         if (item.isOpen()) {
             if (PreferencesManager.isConfirmOpenNetworks(this)) {
                 new AlertDialog.Builder(this)
@@ -292,6 +362,35 @@ public class MainActivity extends Activity {
         } else {
             showPasswordDialog(item);
         }
+    }
+
+    private void showNetworkDetailsDialog(final WifiNetworkItem item) {
+        WifiInfo info = wifiManager.getConnectionInfo();
+        String ip = info != null ? WifiHelper.formatIpAddress(info.getIpAddress()) : "--";
+        int speed = info != null ? info.getLinkSpeed() : 0;
+        String freq = WifiHelper.getFrequencyBand(item.getFrequency());
+
+        String message = "SSID: " + item.getSsid() + "\n" +
+                "BSSID: " + item.getBssid() + "\n" +
+                "IP Address: " + ip + "\n" +
+                "מהירות חיבור: " + speed + " Mbps\n" +
+                "תדר: " + freq + "\n" +
+                "רמת אבטחה: " + WifiHelper.getSecurityDescription(this, item.getCapabilities()) + "\n" +
+                "עוצמת אות: " + WifiHelper.calculateSignalPercentage(item.getLevel()) + "% (" + item.getLevel() + " dBm)";
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.network_details_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.disconnect, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        WifiHelper.disconnect(wifiManager);
+                        Toast.makeText(MainActivity.this, R.string.disconnected_msg, Toast.LENGTH_SHORT).show();
+                        updateCurrentConnectionUI();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private void showPasswordDialog(final WifiNetworkItem item) {

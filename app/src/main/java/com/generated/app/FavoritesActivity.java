@@ -3,10 +3,10 @@ package com.generated.app;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +17,7 @@ public class FavoritesActivity extends Activity {
     private ListView lvFavorites;
     private TextView tvEmpty;
     private Button btnBack;
-    private ArrayAdapter<String> adapter;
+    private FavoritesAdapter adapter;
     private List<String> favoritesList;
 
     @Override
@@ -49,7 +49,20 @@ public class FavoritesActivity extends Activity {
         } else {
             tvEmpty.setVisibility(View.GONE);
             lvFavorites.setVisibility(View.VISIBLE);
-            adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, favoritesList);
+            adapter = new FavoritesAdapter(this, favoritesList, new FavoritesAdapter.OnRemoveClickListener() {
+                @Override
+                public void onRemoveClick(String ssid, int position) {
+                    PreferencesManager.removeFavorite(FavoritesActivity.this, ssid);
+                    favoritesList.remove(position);
+                    adapter.notifyDataSetChanged();
+                    Toast.makeText(FavoritesActivity.this, R.string.favorite_removed, Toast.LENGTH_SHORT).show();
+
+                    if (favoritesList.isEmpty()) {
+                        tvEmpty.setVisibility(View.VISIBLE);
+                        lvFavorites.setVisibility(View.GONE);
+                    }
+                }
+            });
             lvFavorites.setAdapter(adapter);
         }
     }
