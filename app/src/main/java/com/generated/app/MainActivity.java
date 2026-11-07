@@ -14,7 +14,11 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
@@ -37,6 +41,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int PERMISSION_REQUEST_CODE = 2001;
+    private static final long AUTO_RESCAN_INTERVAL_MS = 12000;
 
     private WifiManager wifiManager;
     private Switch switchWifiToggle;
@@ -51,12 +56,25 @@ public class MainActivity extends Activity {
     private ProgressBar progressScanning;
     private TextView tvEmptyState;
     private ListView lvWifiNetworks;
+    private EditText etSearchFilter;
 
     private LinearLayout containerLocationWarning;
     private Button btnEnableLocation;
 
-    private List<WifiNetworkItem> wifiList = new ArrayList<>();
+    private List<WifiNetworkItem> masterWifiList = new ArrayList<>();
+    private List<WifiNetworkItem> displayedWifiList = new ArrayList<>();
     private WifiAdapter wifiAdapter;
+
+    private final Handler rescanHandler = new Handler(Looper.getMainLooper());
+    private final Runnable rescanRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (wifiManager != null && wifiManager.isWifiEnabled() && PreferencesManager.isAutoRescan(MainActivity.this)) {
+                startScan();
+            }
+            rescanHandler.postDelayed(this, AUTO_RESCAN_INTERVAL_MS);
+        }
+    };
 
     private final BroadcastReceiver wifiReceiver = new BroadcastReceiver() {
         @Override
@@ -83,7 +101,7 @@ public class MainActivity extends Activity {
         initViews();
         setupListeners();
 
-        wifiAdapter = new WifiAdapter(this, wifiList, new WifiAdapter.OnFavoriteClickListener() {
+        wifiAdapter = new WifiAdapter(this, displayedWifiList, new WifiAdapter.OnFavoriteClickListener() {
             @Override
             public void onFavoriteClick(WifiNetworkItem item, int position) {
                 toggleFavorite(item);
@@ -111,6 +129,7 @@ public class MainActivity extends Activity {
         progressScanning = findViewById(R.id.progress_scanning);
         tvEmptyState = findViewById(R.id.tv_empty_state);
         lvWifiNetworks = findViewById(R.id.lv_wifi_networks);
+        etSearchFilter = findViewById(R.id.et_search_filter);
 
         containerLocationWarning = findViewById(R.id.container_location_warning);
         btnEnableLocation = findViewById(R.id.btn_enable_location);
@@ -165,10 +184,23 @@ public class MainActivity extends Activity {
             }
         });
 
+        etSearchFilter.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterWifiList(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
         lvWifiNetworks.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                WifiNetworkItem item = wifiList.get(position);
+                WifiNetworkItem item = displayedWifiList.get(position);
                 handleNetworkClick(item);
             }
         });
@@ -232,7 +264,7 @@ public class MainActivity extends Activity {
     private void updateWifiStateUI() {
         boolean isEnabled = wifiManager != null && wifiManager.isWifiEnabled();
         switchWifiToggle.setChecked(isEnabled);
-        tvSensorStatus.setText(isEnabled ? getString(R.string.wifi_on) : getString(R.string.wifi_off));
+        tvSensorStatus.setText(isEnabled ? getString(R.string.wifi_sensor_active) : getString(R.string.wifi_sensor_inactive));
         tvBadgeStatus.setText(isEnabled ? getString(R.string.wifi_on) : getString(R.string.wifi_off));
         tvBadgeStatus.setBackgroundResource(isEnabled ? R.drawable.bg_status_badge : R.drawable.bg_button_secondary);
 
@@ -240,9 +272,10 @@ public class MainActivity extends Activity {
             updateCurrentConnectionUI();
         } else {
             tvConnectedSsid.setText(getString(R.string.not_connected));
-            tvConnectedDetails.setText("חיישן Wi-Fi כבוי");
+            tvConnectedDetails.setText(getString(R.string.wifi_sensor_inactive));
             btnDisconnect.setVisibility(View.GONE);
-            wifiList.clear();
+            masterWifiList.clear();
+            displayedWifiList.clear();
             wifiAdapter.notifyDataSetChanged();
             tvEmptyState.setVisibility(View.VISIBLE);
         }
@@ -271,7 +304,7 @@ public class MainActivity extends Activity {
         if (wifiManager == null || !wifiManager.isWifiEnabled()) return;
 
         List<ScanResult> results = wifiManager.getScanResults();
-        wifiList.clear();
+        masterWifiList.clear();
 
         WifiInfo currentInfo = wifiManager.getConnectionInfo();
         String currentSsid = currentInfo != null ? WifiHelper.sanitizeSsid(currentInfo.getSSID()) : "";
@@ -292,7 +325,7 @@ public class MainActivity extends Activity {
                 boolean isFav = PreferencesManager.isFavorite(this, res.SSID);
                 boolean isConnected = currentSsid.equals(res.SSID);
 
-                wifiList.add(new WifiNetworkItem(
+                masterWifiList.add(new WifiNetworkItem(
                         res.SSID,
                         res.BSSID,
                         res.capabilities,
@@ -305,7 +338,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        Collections.sort(wifiList, new Comparator<WifiNetworkItem>() {
+        Collections.sort(masterWifiList, new Comparator<WifiNetworkItem>() {
             @Override
             public int compare(WifiNetworkItem o1, WifiNetworkItem o2) {
                 if (o1.isConnected() != o2.isConnected()) {
@@ -318,10 +351,22 @@ public class MainActivity extends Activity {
             }
         });
 
-        wifiAdapter.notifyDataSetChanged();
-        tvEmptyState.setVisibility(wifiList.isEmpty() ? View.VISIBLE : View.GONE);
-
+        filterWifiList(etSearchFilter.getText().toString());
         autoConnectFavoritesCheck();
+    }
+
+    private void filterWifiList(String query) {
+        displayedWifiList.clear();
+        String q = query.trim().toLowerCase();
+
+        for (WifiNetworkItem item : masterWifiList) {
+            if (q.isEmpty() || item.getSsid().toLowerCase().contains(q)) {
+                displayedWifiList.add(item);
+            }
+        }
+
+        wifiAdapter.notifyDataSetChanged();
+        tvEmptyState.setVisibility(displayedWifiList.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     private void autoConnectFavoritesCheck() {
@@ -329,7 +374,7 @@ public class MainActivity extends Activity {
         WifiInfo currentInfo = wifiManager.getConnectionInfo();
         if (currentInfo != null && currentInfo.getNetworkId() != -1) return;
 
-        for (WifiNetworkItem item : wifiList) {
+        for (WifiNetworkItem item : masterWifiList) {
             if (item.isFavorite() && item.isOpen()) {
                 WifiHelper.connectToNetwork(wifiManager, item.getSsid(), "", true);
                 break;
@@ -431,7 +476,7 @@ public class MainActivity extends Activity {
             item.setFavorite(true);
             Toast.makeText(this, getString(R.string.favorite_added), Toast.LENGTH_SHORT).show();
         }
-        wifiAdapter.notifyDataSetChanged();
+        filterWifiList(etSearchFilter.getText().toString());
     }
 
     @Override
@@ -445,6 +490,9 @@ public class MainActivity extends Activity {
 
         updateWifiStateUI();
         checkPermissionAndScan();
+
+        rescanHandler.removeCallbacks(rescanRunnable);
+        rescanHandler.postDelayed(rescanRunnable, AUTO_RESCAN_INTERVAL_MS);
     }
 
     @Override
@@ -454,6 +502,7 @@ public class MainActivity extends Activity {
             unregisterReceiver(wifiReceiver);
         } catch (Exception ignored) {
         }
+        rescanHandler.removeCallbacks(rescanRunnable);
     }
 
     @Override

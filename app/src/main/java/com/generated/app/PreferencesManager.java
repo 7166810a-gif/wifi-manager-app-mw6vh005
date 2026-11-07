@@ -11,6 +11,7 @@ public class PreferencesManager {
     private static final String KEY_AUTO_TURN_ON = "auto_turn_on_wifi";
     private static final String KEY_CONFIRM_OPEN = "confirm_open_networks";
     private static final String KEY_AUTO_CONNECT_FAV = "auto_connect_favorites";
+    private static final String KEY_AUTO_RESCAN = "auto_rescan_enabled";
     private static final String KEY_FAVORITES = "favorite_ssids";
 
     private static SharedPreferences getPrefs(Context context) {
@@ -39,6 +40,14 @@ public class PreferencesManager {
 
     public static void setAutoConnectFavorites(Context context, boolean value) {
         getPrefs(context).edit().putBoolean(KEY_AUTO_CONNECT_FAV, value).apply();
+    }
+
+    public static boolean isAutoRescan(Context context) {
+        return getPrefs(context).getBoolean(KEY_AUTO_RESCAN, true);
+    }
+
+    public static void setAutoRescan(Context context, boolean value) {
+        getPrefs(context).edit().putBoolean(KEY_AUTO_RESCAN, value).apply();
     }
 
     public static Set<String> getFavorites(Context context) {

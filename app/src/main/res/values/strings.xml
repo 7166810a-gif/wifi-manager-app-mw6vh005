@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">סורק ומנהל Wi-Fi</string>
+    <string name="app_name">סורק ומנהל Wi-Fi עצמאי</string>
     <string name="wifi_sensor_title">חיישן Wi-Fi עצמאי</string>
     <string name="wifi_on">פעיל</string>
     <string name="wifi_off">כבוי</string>
+    <string name="wifi_sensor_active">חיישן Wi-Fi פעיל ועצמאי</string>
+    <string name="wifi_sensor_inactive">חיישן Wi-Fi כבוי</string>
     <string name="scan_now">סרוק כעת</string>
     <string name="favorites">מועדפים</string>
     <string name="settings">הגדרות</string>
@@ -34,6 +36,10 @@
     <string name="auto_turn_on_wifi">הפעל חיישן Wi-Fi אוטומטית בפתיחת האפליקציה</string>
     <string name="confirm_open_networks">בקש אישור לפני התחברות לרשת פתוחה</string>
     <string name="auto_connect_favorites">התחבר אוטומטית לרשתות מועדפות בסביבה</string>
+
+    <string name="auto_rescan">סריקה מחזורית אוטומטית ברקע</string>
+    <string name="search_hint">חפש רשת לפי שם...</string>
+
     <string name="clear_favorites">מחק את כל המועדפים</string>
     <string name="favorites_cleared">כל המועדפים נמחקו</string>
     <string name="connecting">מתחבר לרשת...</string>
